@@ -1,0 +1,24 @@
+{
+	"name": "My game",
+	"conventions": [
+		"Buildings are low poly and flat shaded: simple forms, faceted curves.",
+		"A building's origin is the middle of its footprint on the ground; the front is -Y.",
+		"Doorways are cut into the walls, never added outward."
+	],
+	"tile": 2.0,
+	"footprint": [2, 2],
+	"road_height": 0.14,
+	"corner_inset": 0.82,
+	"lane_width": 1.0,
+	"default_family": "buildings",
+	"materials": {
+		"wall": ["wall", "eee6ce"],
+		"roof": ["roof", "9874b9"],
+		"trim": ["trim", "4984ce"],
+		"window": ["window", "1c3350"],
+		"metal": ["metal", "8f9c96"],
+		"dark": ["dark", "192a35"]
+	},
+	"asset_folder": "assets",
+	"scale_model": null
+}
