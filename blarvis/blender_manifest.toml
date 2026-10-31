@@ -1,0 +1,19 @@
+schema_version = "1.0.0"
+
+id = "blarvis"
+version = "0.1.0"
+name = "Blarvis"
+tagline = "Model in Blender by chatting with Claude Code, live"
+maintainer = "HaydenDumm"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+network = "Lets Claude Code on this computer connect (localhost only)"
+files = "Reads and saves your asset libraries"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "*.pyc", "*.zip"]

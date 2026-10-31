@@ -2,7 +2,7 @@
 # add-on's preferences; see profiles/example.json) gives the project's name, the
 # conventions Claude should follow, its grid and dimensions, its palette of
 # materials, where its asset libraries are and a model to show for scale. Any
-# field it leaves out comes from DEFAULT, so Jarvis works with no profile at all.
+# field it leaves out comes from DEFAULT, so Blarvis works with no profile at all.
 import json
 from pathlib import Path
 
@@ -36,7 +36,7 @@ DEFAULT = {
 		"pink": ["pink", "dd88ad"],
 		"brown": ["brown", "8a6446"],
 	},
-	# The asset libraries' folder, relative to this file (empty: Jarvis's own folder)
+	# The asset libraries' folder, relative to this file (empty: Blarvis's own folder)
 	"asset_folder": "",
 	# Optional: {"file": a .blend relative to this file, "object": its name} shown
 	# in the test scene for scale

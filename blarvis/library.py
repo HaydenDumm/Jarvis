@@ -1,7 +1,7 @@
 # The asset libraries: every .blend in the assets folder (the preferences' asset
-# folder, else the profile's, else Jarvis's own; register it as an asset library
+# folder, else the profile's, else Blarvis's own; register it as an asset library
 # to see it in the Asset Browser), one per family (<family>_kit.blend), sharing
-# the folder's catalog file (blender_assets.cats.txt). Jarvis lists their assets with each one's notes,
+# the folder's catalog file (blender_assets.cats.txt). Blarvis lists their assets with each one's notes,
 # appends them into the scene, and saves new components into them: the parts
 # are baked into one mesh at its attachment point, marked as an asset with its
 # name, catalog and notes, and merged into the family's file by a background
@@ -72,7 +72,7 @@ def assets(refresh: bool = False) -> list:
 				_index[str(path)] = (mtime, _read(path))
 			except Exception as error:
 				_index[str(path)] = (mtime, [])
-				print("Jarvis: could not read", path, error)
+				print("Blarvis: could not read", path, error)
 		everything.extend(_index[str(path)][1])
 	return everything
 
@@ -154,9 +154,9 @@ def save(objects: list, name: str, catalog: str, family: str, notes: str, origin
 	asset.asset_data.description = notes
 	tree = "/".join(p.strip().title() for p in ((family or default_family()).split("_kit")[0], catalog or "Parts"))
 	asset.asset_data.catalog_id = _catalog_id(tree)
-	asset.asset_data.author = "Jarvis"
+	asset.asset_data.author = "Blarvis"
 	# Written alone to a temporary file, then merged into the family's library
-	temp = Path(tempfile.gettempdir()) / ("jarvis-%s.blend" % uuid.uuid4().hex)
+	temp = Path(tempfile.gettempdir()) / ("blarvis-%s.blend" % uuid.uuid4().hex)
 	bpy.data.libraries.write(str(temp), {asset}, fake_user=True)
 	bpy.data.objects.remove(asset)
 	bpy.data.meshes.remove(mesh)
@@ -168,7 +168,7 @@ def save(objects: list, name: str, catalog: str, family: str, notes: str, origin
 		temp.unlink()
 	except OSError:
 		pass
-	if "JARVIS_MERGED" not in process.stdout:
+	if "BLARVIS_MERGED" not in process.stdout:
 		raise RuntimeError("Saving into %s failed:\n%s" % (target.name, (process.stdout + process.stderr)[-1500:]))
 	_index.pop(str(target), None)
 	try:

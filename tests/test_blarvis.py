@@ -1,15 +1,15 @@
-r"""Headless test of Jarvis, without calling the Claude API.
+r"""Headless test of Blarvis, without calling the Claude API.
 
-Run by tests/run_tests.py (which installs Jarvis into an isolated Blender profile
+Run by tests/run_tests.py (which installs Blarvis into an isolated Blender profile
 first, so your own Blender settings are untouched):
 
   python tests/run_tests.py [--blender PATH] [--profile some_profile.json]
 
 It builds the test scene with the generic defaults and with a full profile,
-builds with every tool, saves a new component into a fresh asset library and
-appends it back, installs the Claude SDK, and runs the Claude tool loop against
-a stand-in client. With --profile, it also builds that profile's test scene and
-lists its assets. Prints JARVIS_TEST OK when every check passes.
+builds with every tool (and a batch), saves a new component into a fresh asset
+library and appends it back, then opens the Claude Code bridge and drives it
+through the real MCP server (bridge/blarvis_mcp.py), as Claude Code does. With --profile, it also builds that profile's test scene and
+lists its assets. Prints BLARVIS_TEST OK when every check passes.
 """
 import json
 import shutil
@@ -24,13 +24,13 @@ import bpy
 args = sys.argv[sys.argv.index("--") + 1:]
 WORK = Path(args[0])
 EXTRA_PROFILE = args[1] if len(args) > 1 and args[1] else ""
-pkg = next(n for n in bpy.context.preferences.addons.keys() if n.endswith("jarvis"))
+pkg = next(n for n in bpy.context.preferences.addons.keys() if n.endswith("blarvis"))
 tools = import_module(pkg + ".tools")
 kit = import_module(pkg + ".kit")
 library = import_module(pkg + ".library")
-agent = import_module(pkg + ".agent")
+bridge = import_module(pkg + ".bridge")
+session = import_module(pkg + ".session").session
 reference = import_module(pkg + ".reference")
-deps = import_module(pkg + ".deps")
 profile = import_module(pkg + ".profile")
 prefs = bpy.context.preferences.addons[pkg].preferences
 failures = []
@@ -42,7 +42,7 @@ def check(ok, what):
 		failures.append(what)
 
 
-# With no profile: generic defaults, assets in Jarvis's own folder
+# With no profile: generic defaults, assets in Blarvis's own folder
 prefs.profile = ""
 prefs.asset_folder = ""
 print(reference.build())
@@ -82,9 +82,19 @@ try:
 	check(False, "a bad object name raises")
 except ValueError as error:
 	check("nope" in str(error), "a bad object name raises a clear error")
+batched = tools.run("batch", {"steps": [
+	{"tool": "make_box", "input": {"name": "b_plinth", "size": [2, 2, 0.14], "material": "ivory", "location": [8, 0, 0]}},
+	{"tool": "make_drum", "input": {"name": "b_drum", "sides": 12, "radius": 0.8, "height": 0.5, "material": "ivory", "on_top_of": "b_plinth"}},
+	{"tool": "add_windows", "input": {"target": "b_drum", "width": 0.15, "height": 0.15, "bottom": 0.2}}]})
+print(batched)
+low, high = kit.world_bounds(bpy.data.objects["b_drum"])
+check(batched.startswith("1.") and "3. Made b_drum_windows" in batched and abs(low.z - 0.14) < 1e-4, "batch builds three pieces in one call, later steps standing on earlier ones")
+stopped = tools.run("batch", {"steps": [{"tool": "make_box", "input": {"name": "b2", "size": [1, 1, 1], "material": "ivory", "on_top_of": "nope"}},
+	{"tool": "make_box", "input": {"name": "b3", "size": [1, 1, 1], "material": "ivory"}}]})
+check("failed" in stopped and "Stopped" in stopped and bpy.data.objects.get("b3") is None, "a failed step stops the batch, and says so")
 definitions = tools.definitions()
 check(any("ivory" in json.dumps(t) for t in definitions) and definitions is tools.definitions(), "tool schemas list the profile's palette, the same list each request")
-check("Test project" in agent.system_prompt() and "Keep it simple." in agent.system_prompt(), "the system prompt carries the profile's conventions")
+check("Test project" in bridge.rules() and "Keep it simple." in bridge.rules(), "Blarvis's rules carry the profile's conventions")
 
 # Saving a new component, then using it
 print(library.save([bpy.data.objects["drum_set"]], "Test Drum Set", "Drums", "", "A drum and its parapet. Origin: its foot."))
@@ -102,41 +112,47 @@ if EXTRA_PROFILE:
 	check(profile.current()["name"] != "Generic", "the given profile (%s) loads" % profile.current()["name"])
 	prefs.profile = str(test_profile)
 
-# The Claude loop, with a stand-in client
-if not deps.text_ready():
-	deps.install(deps.TEXT_PACKAGES)
-	while deps.installing():
-		time.sleep(0.5)
-	print("\n".join(deps.log()[-3:]))
-check(deps.text_ready(), "the Claude SDK installs into Jarvis's folder")
-calls = []
-script = [
-	types.SimpleNamespace(content=[types.SimpleNamespace(type="text", text="Putting a box there."),
-		types.SimpleNamespace(type="tool_use", id="tool_1", name="make_box", input={"name": "agent_box", "size": [1, 1, 1], "material": "purple"})], stop_reason="tool_use"),
-	types.SimpleNamespace(content=[types.SimpleNamespace(type="text", text="Done: a purple box.")], stop_reason="end_turn"),
-]
+# The Claude Code bridge: Blender's side, and the MCP server Claude Code runs
+import os
+import subprocess
+import threading
+bridge.start()
+check(bridge.running() and bridge.INFO_FILE.is_file() and str(bridge.INFO_FILE).startswith(os.environ.get("BLARVIS_HOME", "?")), "the bridge opens and says where (in BLARVIS_HOME)")
+server = subprocess.Popen(["python", str(Path(os.environ["BLARVIS_REPO"]) / "bridge" / "blarvis_mcp.py")],
+	stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=dict(os.environ))
+replies = {}
 
+def talk():
+	requests = [
+		{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "0"}}},
+		{"jsonrpc": "2.0", "method": "notifications/initialized"},
+		{"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+		{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "make_box", "arguments": {"name": "bridge_box", "size": [1, 1, 1], "material": "purple"}}},
+		{"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "blarvis_context", "arguments": {}}},
+		{"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "make_box", "arguments": {"name": "x", "size": [1, 1, 1], "material": "ivory", "on_top_of": "nope"}}},
+	]
+	for request in requests:
+		server.stdin.write((json.dumps(request) + "\n").encode("utf-8"))
+		server.stdin.flush()
+		if "id" in request:
+			replies[request["id"]] = json.loads(server.stdout.readline())
 
-def create(**kwargs):
-	calls.append(kwargs)
-	return script[len(calls) - 1]
-
-
-session = agent.session
-session._client = types.SimpleNamespace(beta=types.SimpleNamespace(messages=types.SimpleNamespace(create=create)))
-session._key = ""
-session.send("Put a purple box at the origin")
-deadline = time.time() + 20
-while (session.busy or not session._jobs.empty()) and time.time() < deadline:
+talker = threading.Thread(target=talk, daemon=True)
+talker.start()
+deadline = time.time() + 60
+while talker.is_alive() and time.time() < deadline:
 	session.pump()
 	time.sleep(0.02)
-session.pump()
-check(bpy.data.objects.get("agent_box") is not None, "a tool call from Claude builds in the scene on the main thread")
-results = [m for m in session.messages if m["role"] == "user" and isinstance(m["content"], list) and m["content"]
-	and isinstance(m["content"][0], dict) and m["content"][0].get("type") == "tool_result"]
-check(len(calls) == 2 and len(results) == 1 and results[0]["content"][0]["tool_use_id"] == "tool_1" and not results[0]["content"][0]["is_error"], "the tool result goes back to Claude")
-check(calls[0]["fallbacks"] == "default" and "server-side-fallback-2026-07-01" in calls[0]["betas"], "Opus requests carry the default refusal fallback")
-check(calls[0]["output_config"] == {"effort": "low"} and calls[0]["model"] == "claude-opus-5-5", "Opus 5.5 at low effort by default")
-check("Asset library" in calls[0]["messages"][0]["content"][0]["text"] and "Test Drum Set" in calls[0]["messages"][0]["content"][0]["text"], "the first message lists the asset library")
-check(any("Done: a purple box." in t for _, t in session.log), "Claude's reply shows in the panel log")
-print("JARVIS_TEST", "OK" if not failures else "FAILED: %s" % failures)
+server.stdin.close()
+server.wait(timeout=10)
+check(replies.get(1, {}).get("result", {}).get("serverInfo", {}).get("name") == "blarvis", "MCP initialize answers as blarvis")
+names = [t["name"] for t in replies.get(2, {}).get("result", {}).get("tools", [])]
+check("make_drum" in names and "viewport_image" in names and "blarvis_context" in names, "MCP lists Blarvis's tools from Blender (%d)" % len(names))
+check(bpy.data.objects.get("bridge_box") is not None and replies.get(3, {}).get("result", {}).get("isError") is False, "a Claude Code tool call builds in the scene")
+context_text = replies.get(4, {}).get("result", {}).get("content", [{}])[0].get("text", "")
+check("Test project" in context_text and "Asset library" in context_text and "bridge_box" in context_text, "blarvis_context gives the rules, library and scene")
+check(replies.get(5, {}).get("result", {}).get("isError") is True and "nope" in replies[5]["result"]["content"][0]["text"], "a failed call comes back as an error, with its reason")
+check(any(who == "claude code" for who, _ in session.log), "Claude Code's calls show in the Blarvis panel")
+bridge.stop()
+check(not bridge.running() and not bridge.INFO_FILE.exists(), "the bridge closes and removes its address")
+print("BLARVIS_TEST", "OK" if not failures else "FAILED: %s" % failures)

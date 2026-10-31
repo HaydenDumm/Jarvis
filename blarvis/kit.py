@@ -1,4 +1,4 @@
-# Jarvis's building blocks, in the project profile's conventions (profile.py):
+# Blarvis's building blocks, in the project profile's conventions (profile.py):
 # its grid, dimensions and palette. A model's origin is the middle of its
 # footprint on the ground; Z is up and the front is -Y. Each material is named
 # as the profile says, so a game reading surfaces by name or colour maps them.
@@ -10,6 +10,7 @@ from mathutils import Matrix, Vector
 
 from . import profile
 
+# (their old name: saved in existing .blend files and matched by projects' build scripts)
 MODEL_COLLECTION = "Jarvis model"
 REFERENCE_COLLECTION = "Jarvis reference"
 

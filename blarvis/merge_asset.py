@@ -1,4 +1,4 @@
-# Run by Jarvis in a background Blender to add one new asset to a family's
+# Run by Blarvis in a background Blender to add one new asset to a family's
 # library file (library.save): opens the library (or starts it), appends the
 # asset from the temporary file it was written to, files it in a collection
 # named after its catalog, laid out beside the others, and saves.
@@ -35,4 +35,4 @@ for obj in target.objects:
 	obj.use_fake_user = False
 bpy.context.preferences.filepaths.save_version = 0
 bpy.ops.wm.save_as_mainfile(filepath=str(library))
-print("JARVIS_MERGED", name, library)
+print("BLARVIS_MERGED", name, library)

@@ -1,10 +1,10 @@
-"""Builds Jarvis, installs it into a throwaway Blender profile and runs tests/test_jarvis.py.
+"""Builds Blarvis, installs it into a throwaway Blender profile and runs tests/test_blarvis.py.
 
   python tests/run_tests.py [--blender PATH] [--profile some_profile.json]
 
-Your own Blender settings and add-ons are never touched. Needs a network
-connection the first time (it installs the Claude SDK into the throwaway
-profile). It never calls the Claude API.
+Your own Blender settings and add-ons are never touched, nor your ~/.blarvis
+folder (the bridge's address goes to a temporary BLARVIS_HOME). Needs Python 3
+on PATH for the MCP server.
 """
 import argparse
 import os
@@ -27,12 +27,12 @@ blender = find_blender(options.blender)
 work = Path(tempfile.mkdtemp(prefix="jv"))
 try:
 	package = build(blender, work / "build")
-	env = dict(os.environ, BLENDER_USER_RESOURCES=str(work / "user"))
+	env = dict(os.environ, BLENDER_USER_RESOURCES=str(work / "user"), BLARVIS_HOME=str(work / "blarvis_home"), BLARVIS_REPO=str(ROOT))
 	subprocess.run([blender, "--command", "extension", "install-file", "-r", "user_default", "--enable", str(package)], check=True, env=env)
-	result = subprocess.run([blender, "-b", "--python", str(ROOT / "tests" / "test_jarvis.py"), "--", str(work),
+	result = subprocess.run([blender, "-b", "--python", str(ROOT / "tests" / "test_blarvis.py"), "--", str(work),
 		str(Path(options.profile).resolve()) if options.profile else ""], env=env, capture_output=True, text=True)
-	lines = [line for line in (result.stdout + result.stderr).splitlines() if line.startswith(("PASS", "FAIL", "JARVIS_TEST", "Traceback", "  File", "Error"))]
+	lines = [line for line in (result.stdout + result.stderr).splitlines() if line.startswith(("PASS", "FAIL", "BLARVIS_TEST", "Traceback", "  File", "Error"))]
 	print("\n".join(lines))
-	sys.exit(0 if "JARVIS_TEST OK" in result.stdout else 1)
+	sys.exit(0 if "BLARVIS_TEST OK" in result.stdout else 1)
 finally:
 	shutil.rmtree(work, ignore_errors=True)

@@ -1,4 +1,4 @@
-# Jarvis's tools: what Claude may do in the scene. Each is a JSON-schema
+# Blarvis's tools: what Claude may do in the scene. Each is a JSON-schema
 # definition (definitions(), sent with every request in a fixed order so the
 # prompt cache holds; its material list is the profile's palette) and a
 # function run on Blender's main thread (run), returning a short text result.
@@ -123,6 +123,12 @@ _TOOLS = [
 		"input_schema": _schema({"objects": _NAMES, "name": {"type": "string"}, "catalog": {"type": "string", "description": "e.g. Drums, Windows, Roofs, Bases, Entrances, Flags, Foundations."},
 			"family": {"type": "string", "description": "Library family (one .blend per family), e.g. civic, housing, props."}, "notes": {"type": "string"},
 			"origin": {"type": "string", "enum": ["bottom_center", "world_origin", "cursor"]}}, ["objects", "name", "catalog", "family", "notes"])},
+	{"name": "batch", "description": "Run several tool calls in order in one go (one round trip, one undo step): the fastest way to build anything with more than one piece. Later steps can stand on pieces made earlier (on_top_of). Stops at the first failure unless keep_going.",
+		"input_schema": _schema({"steps": {"type": "array", "items": {"type": "object", "properties": {"tool": {"type": "string"}, "input": {"type": "object"}}, "required": ["tool", "input"]},
+			"description": "Each a tool's name and its input, as you'd call it alone (not batch, viewport_image or run_python)."},
+			"keep_going": {"type": "boolean", "description": "Carry on past a failed step."}}, ["steps"])},
+	{"name": "viewport_image", "description": "A picture of the 3D viewport as the user sees it, to check your work.",
+		"input_schema": _schema({}, [])},
 	{"name": "run_python", "description": "Run a Blender Python script when no tool fits (bpy, bmesh, math, Vector, Matrix and the kit helpers are imported: kit.mesh_object, kit.box, kit.prism, kit.ring_faces, kit.polygon, kit.material). Print what it made.",
 		"input_schema": _schema({"code": {"type": "string"}, "summary": {"type": "string", "description": "One line: what it does."}}, ["code", "summary"])},
 ]
@@ -163,6 +169,23 @@ def run(name: str, data: dict) -> str:
 	bpy.context.view_layer.update()
 	kit.redraw()
 	return result
+
+
+def _tool_batch(data):
+	lines = []
+	for index, step in enumerate(data.get("steps", []), 1):
+		name = step.get("tool", "")
+		if name in ("batch", "viewport_image", "run_python"):
+			lines.append("%d. %s: not in a batch (call it on its own)" % (index, name))
+			continue
+		try:
+			lines.append("%d. %s" % (index, run(name, step.get("input") or {})))
+		except Exception as error:
+			lines.append("%d. %s failed: %s" % (index, name, error))
+			if not data.get("keep_going"):
+				lines.append("Stopped; steps after %d didn't run." % index)
+				break
+	return "\n".join(lines)
 
 
 def _tool_create_test_scene(data):
@@ -375,12 +398,40 @@ def _tool_propose_asset(data):
 	return "Shown to the user to name and save (or skip). Carry on; don't wait for it."
 
 
+def _tool_viewport_image(data):
+	"""The largest 3D viewport, captured and shrunk to at most 1280 across."""
+	import base64
+	import os
+	import tempfile
+	areas = [(w, a) for w in bpy.context.window_manager.windows for a in w.screen.areas if a.type == "VIEW_3D"]
+	if not areas:
+		return "There's no 3D viewport to capture (Blender is running without a window)."
+	window, area = max(areas, key=lambda wa: wa[1].width * wa[1].height)
+	region = next(r for r in area.regions if r.type == "WINDOW")
+	path = os.path.join(tempfile.gettempdir(), "blarvis-viewport.png")
+	with bpy.context.temp_override(window=window, area=area, region=region):
+		bpy.ops.screen.screenshot_area(filepath=path)
+	image = bpy.data.images.load(path, check_existing=False)
+	try:
+		width, height = image.size
+		if width > 1280:
+			image.scale(1280, max(1, int(height * 1280 / width)))
+			image.filepath_raw = path
+			image.file_format = "PNG"
+			image.save()
+	finally:
+		bpy.data.images.remove(image)
+	with open(path, "rb") as file:
+		encoded = base64.b64encode(file.read()).decode("ascii")
+	return {"type": "image", "media_type": "image/png", "data": encoded, "note": "The 3D viewport (%s)." % ("rendered" if area.spaces[0].shading.type == "RENDERED" else area.spaces[0].shading.type.lower())}
+
+
 def _tool_run_python(data):
 	output = io.StringIO()
 	scope = {"bpy": bpy, "bmesh": bmesh, "math": math, "Vector": Vector, "Matrix": Matrix, "kit": kit}
 	try:
 		with contextlib.redirect_stdout(output):
-			exec(compile(data["code"], "<jarvis>", "exec"), scope)
+			exec(compile(data["code"], "<blarvis>", "exec"), scope)
 	except Exception:
 		return "Error:\n" + traceback.format_exc(limit=3)[-1500:] + "\nOutput before it:\n" + output.getvalue()[-800:]
 	return "Ran: %s\n%s" % (data["summary"], output.getvalue()[-1500:] or "(no output)")

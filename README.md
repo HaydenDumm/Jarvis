@@ -1,68 +1,76 @@
-# Jarvis
+# Blarvis
 
-Model in Blender by telling it what you want. Type or say *"put a 12-sided drum
-on top with a window on each face"*, and Claude builds it in your scene while
-you watch. Ctrl+Z takes any command back.
+Model in Blender by chatting with [Claude Code](https://code.claude.com). Ask
+*"put a 2x2 base down with a 16-sided drum on top, windows all round and a
+dome"*, and Claude Code builds it in your open Blender scene while you watch.
+Each change is one undo step.
 
-Jarvis works from your own asset library: it reuses your components and offers
-to save the new ones it makes. It also follows your project's rules (grid
-size, palette, style) from a small profile file.
+Blarvis is purely a Claude Code integration. It runs on your Claude plan, with
+no API key and no per-request charges. Claude Code builds from your own asset
+library, offers to save the new components it makes, and follows your
+project's rules (grid, palette, style) from a small profile file. It can look
+at your viewport to check its work.
 
 ## What you need
 
-- **Blender 4.2 or newer.** Jarvis is developed on Blender 5.2 for Windows.
-- **A Claude API key** from [console.anthropic.com](https://console.anthropic.com/)
-  (API keys). Requests are billed per use to that account, separately from any
-  Claude subscription. Short commands cost very little, but keep an eye on your
-  usage page while you try it.
-- An internet connection. Voice commands are optional and transcribed on your
-  own computer.
+- **Blender 4.2 or newer.** Blarvis is developed on Blender 5.2 for Windows.
+- **Claude Code** with a Claude plan, in the terminal or in VS Code.
+- **Python 3** on your PATH. Claude Code runs Blarvis's small MCP server with it,
+  using only Python's standard library.
 
 ## Install
 
-1. Download `jarvis-<version>.zip` from this repository's **Releases** page.
-   Don't unzip it.
-2. In Blender, open **Edit > Preferences > Get Extensions**. Open the dropdown
-   at the top right and choose **Install from Disk...**, then pick the zip.
-3. Go to **Add-ons**, find **Jarvis** and expand it:
-   - click **Install** next to *Claude SDK*;
-   - optionally, click **Install** next to *Voice*. It's a few hundred MB; the
-     speech model downloads the first time you talk.
-   - paste your API key into **Anthropic API key**. You can leave it empty if
-     `ANTHROPIC_API_KEY` is set in your environment.
+1. **The Blender add-on.** Download `blarvis-<version>.zip` from this
+   repository's **Releases** page (don't unzip it). In Blender, open **Edit >
+   Preferences > Get Extensions**, open the dropdown at the top right, choose
+   **Install from Disk...** and pick the zip. Then make sure **Blarvis** is
+   ticked under **Add-ons**.
+2. **The MCP server**, so Claude Code can reach Blender. Download or clone this
+   repository, then run once, with your own path:
+
+   ```
+   claude mcp add --transport stdio --scope user blarvis -- python C:\path\to\Blarvis\bridge\blarvis_mcp.py
+   ```
+
+   If `claude` isn't found (for example when you only use the VS Code
+   extension), use the Claude Code executable that comes with the extension:
+   `%USERPROFILE%\.vscode\extensions\anthropic.claude-code-<version>\resources\native-binary\claude.exe`.
+3. **The skill** (recommended). It teaches Claude Code the fast way to use
+   Blarvis: one context read, then whole requests in one batch. Copy
+   `skills/blarvis` into your Claude Code skills folder, `~/.claude/skills/`
+   (on Windows, `%USERPROFILE%\.claude\skills\blarvis`).
 
 ## Use it
 
-Press **N** in the 3D viewport and open the **Jarvis** tab.
+1. In Blender, press **N** and open the **Blarvis** tab. Blarvis connects to
+   Claude Code by itself when Blender starts (you can turn this off in its
+   preferences); otherwise click **Connect Claude Code**.
+2. Start a Claude Code session and ask it to use Blarvis:
+   - *"Use Blarvis to create a test scene"*: reference tiles, the footprint and a
+     scale model, from your profile. The **Test scene** button in the panel does
+     the same.
+   - *"Put a 4 by 4 plinth down, 0.14 tall, with a 12-sided drum on top and a
+     window on each face"*
+   - *"Add a purple parapet round the drum and a faceted dome"*
+   - *"Show me the viewport"*
+3. Claude Code's actions appear in the Blarvis panel. **Ctrl+Z** takes any of
+   them back.
 
-| To | Do |
-| --- | --- |
-| Type a request | Type in the box and press ▶, or press **Alt+Shift+J** anywhere in the viewport (Enter sends) |
-| Talk | Press **Alt+J** (or **Talk**), speak, and press it again |
-| Take a command back | **Ctrl+Z** (each command is one undo step) |
-| Forget the conversation | The new-file button, or say "new conversation" (the scene stays) |
+**Voice:** use your system's dictation in Claude Code's input box: **Win+H** on
+Windows, or press **Fn** twice on a Mac.
 
-Things to try:
-
-- *"Create a test scene"*: reference tiles and a footprint to model against
-  (instant, no API call). *"Create a 3x3 test scene"* sizes the footprint.
-- *"Put a 4 by 4 plinth down, 0.14 tall"*
-- *"Put a drum on top with windows on each face"*
-- *"Add a purple parapet round the drum, then a faceted dome"*
-- *"Put four piers round it"*
-- *"Make the drum 12-sided instead"*
-
-**Saving components.** When Jarvis builds something reusable, a **Save this new
-component?** box appears with a suggested name, catalog and notes. Edit them and
-click **Save component**. It's saved as a Blender asset in
-`<asset folder>/<family>_kit.blend`. To see it in the Asset Browser, add the
-asset folder under **Edit > Preferences > File Paths > Asset Libraries**.
+**Saving components.** When Claude Code builds something reusable, a **Save
+this new component?** box appears in the Blarvis panel with a suggested name,
+catalog and notes. Edit them and click **Save component**. It's saved as a
+Blender asset in `<asset folder>/<family>_kit.blend`. To see it in the Asset
+Browser, add the asset folder as a library under **Edit > Preferences >
+Assets** (in older Blender versions: **File Paths > Asset Libraries**).
 
 ## Project profiles
 
-Out of the box Jarvis uses generic settings: a 1-unit grid, a simple palette,
+Out of the box Blarvis uses generic settings: a 1-unit grid, a simple palette
 and its own asset folder. To fit your project, write a profile and choose it
-under **Project profile** in Jarvis's preferences. A profile is a JSON file;
+under **Project profile** in Blarvis's preferences. A profile is a JSON file;
 start from [profiles/example.json](profiles/example.json).
 
 | Field | Meaning |
@@ -83,51 +91,47 @@ its default.
 
 ## Good to know
 
-- **What it sends:** each request sends Claude your request, the profile's
-  conventions and a short list of your model's objects (names, bounds,
-  materials). A conversation's first request also lists your asset library.
-- **Scripts:** when no tool fits, Claude may write and run a short Blender
-  Python script. Its one-line summary shows in the log, and undo works. Save
-  your file before big experiments.
-- **Model and speed:** Claude Opus 5.5 at low effort is the default. Sonnet 5.5
-  replies faster, and Haiku 5.5 is the fastest and cheapest, fine for simple
-  placing. Change these in the preferences.
-- **Refusals:** Opus and Sonnet requests use the API's default refusal fallback.
-  If a request is ever declined, it's re-run once on Anthropic's recommended
-  fallback model.
-- **Collections:** Jarvis's pieces go into the *Jarvis model* collection. The
-  test scene goes into *Jarvis reference*, which is never saved as an asset.
+- **Only your computer can connect.** The bridge listens on 127.0.0.1 and
+  checks a random token. Its address is in `~/.blarvis/bridge.json` while it's
+  connected.
+- **Scripts:** when no tool fits, Claude Code may run a short Blender Python
+  script in your scene. Undo works, but save your file before big experiments.
+- **Collections:** pieces go into the *Jarvis model* collection. The test scene
+  goes into *Jarvis reference*, which is never saved as an asset.
+- Claude Code usage counts toward your Claude plan's limits as usual.
 
 ## Develop
 
-Jarvis is plain Python inside `jarvis/`. To work on it from a clone:
+Blarvis is plain Python: the add-on is in `blarvis/`, the MCP server in `bridge/`,
+and the Claude Code skill in `skills/`. To work on the add-on from a clone:
 
 1. In Blender, open **Get Extensions**, open the dropdown at the top right, and
-   choose **Repositories > + > Add Local Repository**. Pick this repository's
-   folder.
-2. Enable Jarvis. Code changes load after you restart Blender, or disable and
-   re-enable it.
+   choose **Repositories > + > Add Local Repository**.
+2. Tick **Custom Directory** and choose this repository's folder, then enable
+   Blarvis.
 
-Two scripts, both needing only Python's standard library and Blender:
+Code changes load when you restart Blender. Two scripts, both needing only
+Python's standard library and Blender:
 
-- `python build.py` builds `dist/jarvis-<version>.zip`, the file to attach to a
+- `python build.py` builds `dist/blarvis-<version>.zip`, the file to attach to a
   GitHub release.
-- `python tests/run_tests.py` builds Jarvis, installs it into a throwaway Blender
-  profile, and runs the headless tests. Your own Blender settings are never
-  touched, and the tests never call the API. Add `--profile your.json` to also
-  try your profile.
+- `python tests/run_tests.py` builds Blarvis, installs it into a throwaway Blender
+  profile, and tests the tools, the library and the bridge. It drives the bridge
+  through the real MCP server, as Claude Code does. Add `--profile your.json` to
+  also try your profile.
 
 | File | What it does |
 | --- | --- |
-| `jarvis/__init__.py` | Preferences, the panel, operators, hotkeys, the instant commands |
-| `jarvis/agent.py` | The Claude conversation: the tool loop on a worker thread, with tool calls run on Blender's main thread |
-| `jarvis/tools.py` | The tools Claude can use (schemas and code) |
-| `jarvis/kit.py` | Materials and mesh builders |
-| `jarvis/profile.py` | Project profiles |
-| `jarvis/library.py`, `jarvis/merge_asset.py` | Listing, appending and saving assets |
-| `jarvis/reference.py` | The test scene |
-| `jarvis/voice.py` | Recording and offline transcription |
-| `jarvis/deps.py` | Installs the Python packages |
+| `blarvis/__init__.py` | Preferences, the panel and its buttons, the save box |
+| `blarvis/bridge.py` | The bridge Claude Code connects to, and Blarvis's rules for Claude |
+| `blarvis/session.py` | Runs Claude Code's calls on Blender's main thread; the panel's log |
+| `blarvis/tools.py` | The tools (schemas and code), including `batch` and `viewport_image` |
+| `blarvis/kit.py` | Materials and mesh builders |
+| `blarvis/profile.py` | Project profiles |
+| `blarvis/library.py`, `blarvis/merge_asset.py` | Listing, appending and saving assets |
+| `blarvis/reference.py` | The test scene |
+| `bridge/blarvis_mcp.py` | The MCP server Claude Code runs |
+| `skills/blarvis/SKILL.md` | The Claude Code skill |
 
 ## License
 

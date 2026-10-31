@@ -1,8 +1,8 @@
-"""Builds Jarvis's installable zip into dist/ (Python's standard library only).
+"""Builds Blarvis's installable zip into dist/ (Python's standard library only).
 
   python build.py [--blender PATH]
 
-Upload dist/jarvis-<version>.zip to a GitHub release; people install it in
+Upload dist/blarvis-<version>.zip to a GitHub release; people install it in
 Blender with Edit > Preferences > Get Extensions > Install from Disk.
 """
 import argparse
@@ -31,10 +31,10 @@ def find_blender(explicit: str = "") -> str:
 
 def build(blender: str, out_dir: Path) -> Path:
 	out_dir.mkdir(parents=True, exist_ok=True)
-	subprocess.run([blender, "--command", "extension", "validate", str(ROOT / "jarvis")], check=True)
-	subprocess.run([blender, "--command", "extension", "build", "--source-dir", str(ROOT / "jarvis"), "--output-dir", str(out_dir)], check=True)
-	version = next(line.split('"')[1] for line in (ROOT / "jarvis" / "blender_manifest.toml").read_text().splitlines() if line.startswith("version"))
-	return out_dir / ("jarvis-%s.zip" % version)
+	subprocess.run([blender, "--command", "extension", "validate", str(ROOT / "blarvis")], check=True)
+	subprocess.run([blender, "--command", "extension", "build", "--source-dir", str(ROOT / "blarvis"), "--output-dir", str(out_dir)], check=True)
+	version = next(line.split('"')[1] for line in (ROOT / "blarvis" / "blender_manifest.toml").read_text().splitlines() if line.startswith("version"))
+	return out_dir / ("blarvis-%s.zip" % version)
 
 
 if __name__ == "__main__":
